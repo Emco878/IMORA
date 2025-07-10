@@ -34,7 +34,7 @@ UI
 - Load Button: Loads the Image or GIF on the screen.
 - Save Button: Saves the Position of the Image or GIF.
 - Clear Button: Clears the Console.
-- [1 - 9] Input: Number of times to decrease the scale of the Image or GIF.
+- Scaler: Scale the Number of times you would want decrease your Image or GIF.
 - ⚙ Settings: Opens `settings.json` which stores the image, scale, and its coordinates.
 - 🔒 Lock: Prevents the Image or GIF from being dragged and locks it in place.
 
