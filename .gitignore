@@ -3,4 +3,6 @@
 build/
 dist/
 
+changelogs.txt
+
 main.spec
