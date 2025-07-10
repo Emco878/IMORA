@@ -1,5 +1,5 @@
 # ---- Regular Imports ---- #
-import sys, os, json
+import sys, os, json, math
 
 def resource_path(relative_path):
     """ Get absolute path to resource, works for dev and PyInstaller """
@@ -9,11 +9,12 @@ def resource_path(relative_path):
 
 
 # ---- PyQt5 Imports ---- #
-from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLineEdit, QTextEdit, QLabel, QFileDialog, QWidget, QSystemTrayIcon, QMenu, QAction
+from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLineEdit, QTextEdit, QSlider, QLabel, QFileDialog, QWidget, QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QRegularExpressionValidator, QPixmap, QMovie, QCloseEvent, QIcon
 from PyQt5.QtCore import Qt, QRegularExpression, QSize, QTimer
 
 # ---- Globals ---- #
+num = 1
 draggable = True
 data = {}
 settings_path = "settings.json"
@@ -36,7 +37,6 @@ class MainWindow(QMainWindow):
         self.tray_icon = QSystemTrayIcon(self)
         self.tray_icon.setIcon(QIcon(resource_path("assets/Logo_Bar.png")))
 
-
         tray_menu = QMenu(self)
 
         tray_menu.setStyleSheet("""
@@ -50,7 +50,7 @@ class MainWindow(QMainWindow):
         quit_action = QAction("Quit", self)
 
         show_action.triggered.connect(self.show)
-        quit_action.triggered.connect(QApplication.instance().quit)
+        quit_action.triggered.connect(exit_app)
 
         tray_menu.addAction(show_action)
         tray_menu.addAction(quit_action)
@@ -88,10 +88,6 @@ class MainWindow(QMainWindow):
         self.clear_button = self.create_button("Clear", 50, 625, 100, 50)
         self.clear_button.clicked.connect(self.clear_console)
 
-        #* / Button *#
-        self.division_button = self.create_button("/", 455, 625, 50, 50)
-        self.division_button.setDisabled(True)
-
         #* Settings Button *#
         self.settings_button = self.create_button("⚙", 960, 625, 50, 50)
         self.settings_button.clicked.connect(self.setting_click)
@@ -102,19 +98,32 @@ class MainWindow(QMainWindow):
         self.console.setGeometry(200, 150, 300, 450)
         self.console.setStyleSheet("""font-size: 18px; font-family: "Segoe UI"; background: #1E1E1E; color: #FFFFFF; border: 2px solid #FFFFFF;""")
 
-        #* Scale Amount Input *#
-        self.amount = self.create_textbox("", 510, 625, 75, 50)
-        self.amount.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: #1E1E1E; color: #FFFFFF; border: 2px solid #FFFFFF; border-radius: 8px;""")
-        self.amount.setPlaceholderText("1-9")
-        self.amount.setAlignment(Qt.AlignCenter)
-        regex = QRegularExpression("[1-9]") # Defines the regex pattern
-        validator = QRegularExpressionValidator(regex)  # Creates a validator object
-        self.amount.setValidator(validator)    # Applies the validator to the input box
-        self.amount.setReadOnly(False)
-        self.size_num = self.amount.text()
+        #* Scale Slider *#
+        self.slider = QSlider(Qt.Horizontal, self)
+        self.slider.setGeometry(200, 625, 400, 50)
+        self.slider.setValue(10)    # Since we are dividing by 10, 10/10 = 1
+        self.slider.setMinimum(10)
+        self.slider.setMaximum(120)
 
+        self.slider.setStyleSheet("""
+            QSlider {border: 2px solid #FFFFFF; border-radius: 23px;}
+            QSlider::groove:horizontal {background: #1E1E1E; height: 46px; border-radius: 23px;}
+            QSlider::handle:horizontal {background: #FFFFFF; width: 46px; border-radius: 23px;}
+            QSlider::handle:horizontal:hover {background: #818181;}
+            QSlider::handle:horizontal:pressed {background: #747474;}
+        """)
+        self.slider.valueChanged.connect(self.scale_output)
+
+        #* / Label *#
+        self.division_button = self.create_label("/", 615, 625, 50, 50)
+
+        #* Scale Label *#
+        self.scale_label = self.create_label("1 - 12", 640, 625, 75, 50)
+        self.scale_label.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: #1E1E1E; color: #A9A9A9; border: 2px solid #FFFFFF; border-radius: 8px;""")
+        self.scale_label.setAlignment(Qt.AlignCenter)
+        
         #* F1 Controls *#
-        self.controls = self.create_label("F1 = Close Image", 590, 625, 185, 50)
+        self.controls = self.create_label("F1 = Close Image", 735, 625, 185, 50)
         self.controls.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: #1E1E1E; color: #00FF00; border: 2px solid #FFFFFF; border-radius: 8px;""")
         self.controls.hide()
 
@@ -126,11 +135,6 @@ class MainWindow(QMainWindow):
         #* Image Preview Text Overlay *#
         self.text_overlay = self.create_label("", 515, 155, 90, 36)
         self.text_overlay.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: transparent; color: #FFFFFF; border: none;""") 
-
-        #* Filename Label *#
-        self.filename_text = self.create_textbox("", 200, 625, 250, 50)
-        self.filename_text.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: #1E1E1E; color: #FFFFFF; border: 2px solid #FFFFFF; border-radius: 8px;""")
-        self.filename_text.setPlaceholderText(" File:")
 
         #* Position Label *#
         self.position_label = self.create_textbox("Position:", 60, 470, 130, 25)
@@ -183,7 +187,6 @@ class MainWindow(QMainWindow):
     def open_button_click(self):
         global draggable 
 
-        self.amount.setText("")
         draggable = True
         self.lock_button.hide()
         self.unlock_button.show()
@@ -215,43 +218,43 @@ class MainWindow(QMainWindow):
             self.text_overlay.setAlignment(Qt.AlignLeft)
             self.text_overlay.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: rgba(0, 0, 0, 128); color: #FFFFFF; border: none; border-radius: 10px;""")
             self.filename = os.path.basename(self.file_path)
-            self.filename_text.setText(f" File: {self.filename}")
         else:   # Removes preview box if you close the open folder
-            self.image_preview.clear()
-            self.filename_text.clear()
-            self.text_overlay.clear()
+            self.scale_label.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: #1E1E1E; color: #A9A9A9; border: 2px solid #FFFFFF; border-radius: 8px;""")
+            self.scale_label.setText("1 - 12")
             self.text_overlay.setStyleSheet("background: transparent;")
+            self.text_overlay.clear()
             self.image_preview.setGeometry(510, 150, 500, 450)
+            self.image_preview.clear()
             self.x_position_text.setText("X: ")
             self.y_position_text.setText("Y: ")
 
+    # ---- Scale Slider Logic ---- #
+    def scale_output(self, value):
+        global num
+        num = math.floor(value / 10)
+        self.scale_label.setStyleSheet("""font-size: 22px; font-family: "Segoe UI"; background: #1E1E1E; color: #FFFFFF; border: 2px solid #FFFFFF; border-radius: 8px;""")
+        self.scale_label.setText(f"{num:.0f}")
+
     # ---- Scale Logic ---- #
     def operation_confirm(self):
+        global num
         if not hasattr(self, "file_path") or not self.file_path:
             return
 
-        try:
-            self.size_num = int(self.amount.text())
-        except ValueError:
-            self.size_num = 1
-
-        # self.size_num = self.size_num  # Store the latest valid size
-        # self.operation_result = self.operation  # Store latest operation
-
         self.image_display = QMovie(self.file_path)
         self.image_display.start()
-        self.image_display.stop()  # Stop to access size
+        self.image_display.stop()
 
         self.original_size = self.image_display.currentPixmap().size()
 
-        scaled_width = self.original_size.width() // self.size_num
-        scaled_height = self.original_size.height() // self.size_num
+        scaled_width = int(self.original_size.width() / num)
+        scaled_height = int(self.original_size.height() / num)
 
         self.image_display.setScaledSize(QSize(scaled_width, scaled_height))
-        
-        self.new_message = (f"🟢 {self.filename} Scaled by {self.size_num}")
+
+        self.new_message = (f"🟢 {self.filename} Scaled by {num:.0f}")
         last_line = self.console.toPlainText().split('\n')[-1]
-        if not last_line.endswith(f'{self.filename} Scaled by {self.size_num}'):
+        if not last_line.endswith(f'{self.filename} Scaled by {num:.0f}'):
             self.console.append(self.new_message)
 
     # ---- Load Button Click Logic  ---- #
@@ -329,7 +332,7 @@ class MainWindow(QMainWindow):
 
         # Get valid size_num
         try:
-            self.size_num = int(self.amount.text())
+            self.size_num = num
         except ValueError:
             self.size_num = 1  # fallback if empty
 
@@ -358,7 +361,7 @@ class MainWindow(QMainWindow):
         self.console.setText("🟢 Console Cleared")
         QTimer.singleShot(750, self.console.clear)
 
-    # ---- Scales between / and X ---- #
+    # ---- Lock or Unlock ---- #
     def operation_click(self):
         if not hasattr(self, "file_path") or not self.file_path:
             return
@@ -379,8 +382,7 @@ class MainWindow(QMainWindow):
 
     # ---- Function to Open settings.json  ---- #
     def setting_click(self):
-        settings_path = os.path.join(os.path.dirname(__file__), "settings.json")
-
+        settings_path = os.path.join(app_dir(), "settings.json")
         if not os.path.exists(settings_path):
             last_line = self.console.toPlainText().split('\n')[-1]
             if "Settings.json does not exist" not in last_line:
@@ -404,7 +406,7 @@ class MainWindow(QMainWindow):
             self.overlay_window.close()
             self.controls.hide()
 
-    # ---- Taskbar Setup ---- #
+    # # ---- Taskbar Setup ---- #
     def closeEvent(self, event):
         event.ignore()
         self.hide()
@@ -415,6 +417,18 @@ class MainWindow(QMainWindow):
             self.raise_()
             self.activateWindow()
 
+# ---- Helper to get app directory ---- #
+def app_dir():
+    if getattr(sys, 'frozen', False):
+        # Running as .exe
+        return os.path.dirname(sys.executable)
+    else:
+        # Running as .py
+        return os.path.dirname(os.path.abspath(__file__))
+    
+def exit_app():
+    QApplication.quit()
+
 def main():
     app = QApplication(sys.argv)
     window = MainWindow()
@@ -423,5 +437,3 @@ def main():
 
 if __name__ == "__main__":
     main()
-
-#TODO: Make the application have a name if you hover over it in the taskbar
