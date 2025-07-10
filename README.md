@@ -17,7 +17,7 @@
 ## 🛠️ Installation
 Download the latest release version of [IMORA.exe](https://github.com/Emco878/IMORA/releases/latest)
 
->⚠️ **Note**: This app is now signed however SmartScreen may warn you as my repuration is low. The program is safe. The source code, can be found in `main.py`
+>⚠️ **Note**: This app is now signed however SmartScreen may warn you as my reputation is low. The program is safe. The source code, can be found in `main.py`
 
 ## ✨ Features
 - Save Image/GIF position
