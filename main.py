@@ -11,7 +11,7 @@ def resource_path(relative_path):
 # ---- PyQt5 Imports ---- #
 from PyQt5.QtWidgets import QApplication, QMainWindow, QPushButton, QLineEdit, QTextEdit, QSlider, QLabel, QFileDialog, QWidget, QSystemTrayIcon, QMenu, QAction
 from PyQt5.QtGui import QRegularExpressionValidator, QPixmap, QMovie, QCloseEvent, QIcon
-from PyQt5.QtCore import Qt, QRegularExpression, QSize, QTimer
+from PyQt5.QtCore import Qt, QRegularExpression, QEvent, QSize, QTimer
 
 # ---- Globals ---- #
 num = 1
@@ -22,7 +22,6 @@ settings_path = "settings.json"
 class MainWindow(QMainWindow):
     def __init__(self):
         super().__init__()
-        self.operation = "/"
         self.setFocusPolicy(Qt.StrongFocus)
 
         self.setGeometry(700, 300, 1080, 700)
@@ -275,6 +274,7 @@ class MainWindow(QMainWindow):
 
         # Load Settings
         try:
+            self.size_num = math.floor(self.slider.value() / 10)  # Sync with slider
             if os.path.exists(settings_path):
                 with open("settings.json", "r") as f:
                     data = json.load(f)
@@ -406,10 +406,15 @@ class MainWindow(QMainWindow):
             self.overlay_window.close()
             self.controls.hide()
 
-    # # ---- Taskbar Setup ---- #
+    # ---- Taskbar Setup ---- #
+    def changeEvent(self, event):
+        if event.type() == QEvent.WindowStateChange:
+            if self.isMinimized():
+                QTimer.singleShot(0, self.hide)  # Hide after minimizing
+        super().changeEvent(event)
+
     def closeEvent(self, event):
-        event.ignore()
-        self.hide()
+        exit_app
 
     def on_tray_icon_activated(self, reason):
         if reason == QSystemTrayIcon.Trigger:  # Left click
